@@ -157,8 +157,9 @@ namespace ZapretDesktop {
                 ApplyBackendView();
                 proxyProfile.Enabled=applyProxy.Enabled=idle;openProxyYouTube.Enabled=idle && runner.ProxyRunning && CurrentScope().YouTube;openProxyDiscord.Enabled=idle && runner.ProxyRunning && CurrentScope().Discord;
                 if(ProxyMode){telegram.Enabled=false;startWindows.Enabled=false;dashboard.Apply.Enabled=dashboard.Scan.Enabled=false;dashboard.SetFeedback(false);}
-                if(ProxyMode || store.Settings.StrictScope){games.Enabled=tcp.Enabled=udp.Enabled=saveGameButton.Enabled=false;gameSaved.Text="Не используется в выбранном режиме";}
+                if(ProxyMode)games.Enabled=tcp.Enabled=udp.Enabled=saveGameButton.Enabled=false;
                 if(ProxyMode)domainEditor.SetAllowed(false,false);
+                RefreshGameStatus();
                 telegramStatus.Text=ProxyMode?"Для моста Telegram выберите zapret на главной вкладке.":telegramChanging?"Изменяем подключение…":runner.TelegramRunning?"Мост включён · WinDivert используется":"Мост выключен";
                 if(!runner.Running && !runner.TelegramRunning && footprint!=null && !footprint.Clean){state.Text="Обход ByPass выключен · есть компоненты";state.ForeColor=Theme.Warning;subtitle.Text=footprint.Summary+" · подробности в настройках";}
                 else if(ProxyMode){state.Text=runner.ProxyRunning?"ByeDPI включён":"ByeDPI выключен";subtitle.Text=runner.ProxyRunning?"Только отдельное окно · "+store.Settings.ProxyStrategy:"YouTube и Discord в браузере · без системного прокси";}

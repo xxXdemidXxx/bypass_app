@@ -115,6 +115,56 @@ namespace ZapretDesktop {
                 foreach(string profile in ProxyBypass.Profiles){string args=ProxyBypass.Arguments(profile,12345,new ScopeOptions());Assert(args.Contains("--ip 127.0.0.1") && args.Contains("--no-udp") && args.Contains("--hosts") && !args.Contains("--daemon"),"ByeDPI remains local with a bounded host scope: "+profile);}
             }finally{RemoveFixture(folder);}
         }
+        static void GameSettingsUiTest(string root,string official){
+            string folder=Path.Combine(root,"tests","fixture-game-settings-"+Guid.NewGuid().ToString("N"));
+            var flags=BindingFlags.Instance|BindingFlags.NonPublic;
+            var previousStartup=StartupService.TestRead;
+            var previousRegistration=StartupRegistration.TestRead;
+            var previousFootprint=NetworkFootprint.TestRead;
+            StartupService.TestRead=_=>new StartupState();
+            StartupRegistration.TestRead=()=>null;
+            NetworkFootprint.TestRead=()=>new NetworkFootprint();
+            try{
+                var store=new Store(folder);
+                Copy(official,store.Current);
+                TelegramFilter.Set(store.Current,false);
+                store.Settings.CheckUpdates=store.Settings.AutoAppUpdates=store.Settings.AutoInstallCore=store.Settings.AutoInstallShell=false;
+                using(var form=new MainForm(store,false)){
+                    var runner=(EngineRunner)typeof(MainForm).GetField("runner",flags).GetValue(form);
+                    runner.ConflictCheck=()=>false;
+                    runner.TestSync=(engine,strategy)=>{};
+                    form.Show();Application.DoEvents();
+                    ((System.Windows.Forms.Timer)typeof(MainForm).GetField("timer",flags).GetValue(form)).Stop();
+                    var tabs=FindTabs(form);
+                    tabs.SelectedIndex=tabs.TabPages.FindIndex(page=>page.Text=="Дополнительно");
+                    AllControls(form).OfType<Button>().Single(button=>button.Name=="AdvancedGames").PerformClick();
+                    var modes=(DarkSelect)typeof(MainForm).GetField("games",flags).GetValue(form);
+                    var status=(Label)typeof(MainForm).GetField("gameSaved",flags).GetValue(form);
+                    string scopedArguments=Strategy.Arguments(store.Current,store.Settings.Strategy);
+
+                    typeof(DarkSelect).GetMethod("OnClick",flags).Invoke(modes,new object[]{EventArgs.Empty});
+                    Application.DoEvents();
+                    var popup=(ToolStripDropDown)typeof(DarkSelect).GetField("popup",flags).GetValue(modes);
+                    Assert(store.Settings.StrictScope && !runner.Running && popup!=null && popup.Visible,"Game mode opens while stopped with strict scope enabled");
+                    modes.Choose(2);
+                    AllControls(form).OfType<Button>().Single(button=>button.Text.StartsWith("Настроить порты")).PerformClick();
+                    var tcp=(TextBox)typeof(MainForm).GetField("tcp",flags).GetValue(form);
+                    Assert(tcp.Visible && tcp.Enabled && status.Text.Contains("Настройки zapret"),"Port fields open for editing and display the scope requirement");
+
+                    tcp.Text="27015-27030";
+                    ((Button)typeof(MainForm).GetField("saveGameButton",flags).GetValue(form)).PerformClick();
+                    string tcpPorts,udpPorts;
+                    Strategy.GamePorts(store.Current,out tcpPorts,out udpPorts);
+                    Assert(tcpPorts=="27015-27030" && udpPorts=="12" && status.Text.StartsWith("Настройки сохранены"),"Selected TCP mode and custom ports are saved");
+                    Assert(ServiceScope.Read(store.Current).Strict && Strategy.Arguments(store.Current,store.Settings.Strategy)==scopedArguments && !runner.Running,"Saving game settings preserves the limited scope and leaves the bypass stopped");
+                }
+            }finally{
+                StartupService.TestRead=previousStartup;
+                StartupRegistration.TestRead=previousRegistration;
+                NetworkFootprint.TestRead=previousFootprint;
+                RemoveFixture(folder);
+            }
+        }
         static void WorkspaceTests(string root,string official,bool native){
             string folder=Path.Combine(root,"tests","fixture-workspace-"+Guid.NewGuid().ToString("N"));var flags=BindingFlags.Instance|BindingFlags.NonPublic;
             string registration=null;StartupRegistration.TestRead=()=>registration;StartupRegistration.TestWrite=value=>registration=value;StartupState startup=new StartupState();StartupService.TestRead=_=>startup;
